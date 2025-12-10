@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8" />
+  <title>Cross Loučka - Finální Mapa</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-minimap@3.6.1/dist/Control.MiniMap.min.css" />
+  <script src="https://unpkg.com/leaflet-minimap@3.6.1/dist/Control.MiniMap.min.js"></script>
+
+  <style>
+    /* ZÁKLADNÍ STYLY */
+    html, body { margin: 0; height: 100%; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #fff5f6; }
+    #map { height: 85vh; width: 100%; border-top: 2px solid #ffc1cc; border-bottom: 2px solid #ffc1cc; }
+
+    /* --- NADPIS --- */
+    .map-title {
+      background: rgba(255, 255, 255, 0.95); 
+      padding: 5px 25px; 
+      text-align: center;
+      border: 2px solid #ffc1cc; 
+      border-radius: 20px; 
+      margin: 5px auto 5px auto;
+      box-shadow: 0 4px 15px rgba(255, 182, 193, 0.3); 
+      width: fit-content; 
+      color: #db7093; 
+    }
+    .map-title h4 { margin: 0; font-size: 22px; letter-spacing: 1px; }
+
+    /* SPOLEČNÝ STYL PRO PANELY */
+    .pinkity-panel {
+      background: rgba(255, 255, 255, 0.98); 
+      padding: 0; 
+      border: 2px solid #ffc1cc; border-radius: 15px;
+      box-shadow: 0 4px 15px rgba(255, 182, 193, 0.4);
+      color: #333; font-size: 14px; line-height: 1.6em;
+      margin-bottom: 10px !important;
+      overflow: hidden; 
+      min-width: 200px; 
+      clear: both;
+    }
+
+    /* HLAVIČKA PANELU */
+    .panel-header {
+        background: #fff0f5;
+        padding: 10px 15px;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid #ffe0e6;
+        user-select: none;
+    }
+    .panel-header:hover { background: #ffe6ea; }
+    .panel-header h4 { margin: 0; color: #db7093; font-size: 14px; text-transform: uppercase; font-weight: 700; }
+    .toggle-icon { font-weight: bold; color: #db7093; transition: transform 0.3s; }
+
+    /* OBSAH PANELU */
+    .panel-content {
+        padding: 12px 15px;
+        display: block;
+        max-height: 500px;
+        opacity: 1;
+        transition: max-height 0.4s ease-out, opacity 0.3s ease-out, padding 0.3s;
+        overflow: hidden;
+    }
+
+    /* SBALOVÁNÍ */
+    .pinkity-panel.collapsed .panel-content { max-height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; border: none; }
+    .pinkity-panel.collapsed .toggle-icon { transform: rotate(-90deg); }
+    .pinkity-panel.collapsed { width: auto; }
+
+    /* --- KOMPAKTNÍ PANEL PODKLADY (Headless) --- */
+    .headless-panel {
+        min-width: 150px !important; 
+        width: fit-content !important; 
+    }
+    .headless-panel .panel-content {
+        padding: 8px 12px !important; 
+    }
+    .headless-panel label {
+        margin-bottom: 2px !important; 
+        font-size: 13px !important; 
+    }
+    .headless-panel .layer-separator { 
+        border-top: 1px solid #ddd; 
+        margin: 6px 0 !important; 
+    }
+
+    /* STYL PRVKŮ (Rádia a Checkboxy) */
+    .pinkity-panel label { 
+        display: flex; 
+        align-items: center; 
+        cursor: pointer; 
+        margin-bottom: 8px; 
+        font-size: 14px; 
+    }
+    .pinkity-panel input[type="radio"],
+    .pinkity-panel input[type="checkbox"] { 
+        accent-color: #9c27b0; 
+        margin-right: 8px; width: 15px; height: 15px; cursor: pointer;
+    }
+    
+    /* --- STYL PRO SVG IKONY (Čáry se zaoblením) --- */
+    .track-svg {
+        margin-right: 8px;
+        vertical-align: middle;
+        display: inline-block;
+    }
+
+    /* LEGENDA - ikony ploch */
+    .poly-icon { 
+        display: inline-block;
+        width: 30px; 
+        height: 15px; 
+        border: 1px solid rgba(0,0,0,0.2); 
+        border-top: 1px solid rgba(0,0,0,0.2); 
+        vertical-align: middle;
+        margin-right: 8px;
+    }
+    
+    /* PATIČKA */
+    .authors-footer {
+        position: fixed; 
+        bottom: 10px; 
+        left: 10px; 
+        background: rgba(255, 255, 255, 0.95); 
+        padding: 8px 20px; 
+        border-radius: 15px; 
+        border: 1px solid #ffc1cc; 
+        font-size: 11px; color: #db7093; font-weight: 600; z-index: 2000;
+        display: flex; align-items: center;
+    }
+    .custom-popup .leaflet-popup-content-wrapper { border: 2px solid #ffc1cc; border-radius: 10px; }
+    .popup-title { font-weight: bold; color: #db7093; text-transform: uppercase; border-bottom: 1px solid #eee; margin-bottom: 5px; }
+    .leaflet-bar { border: 2px solid #ffc1cc !important; border-radius: 8px !important; box-shadow: 0 4px 10px rgba(255,182,193,0.4) !important; border:none;}
+    .leaflet-bar a { color: #db7093 !important; background: rgba(255,255,255,0.95) !important; border-bottom: 1px solid #ffc1cc !important; }
+    
+    /* 💅 ZVĚTŠENÍ IKONKY HRADU ZDE */
+    .home-icon {
+      font-size: 23px; /* Změněno z 18px na 24px */
+      line-height: 30px; 
+      display: block; 
+      text-align: center; 
+      text-decoration: none;
+    }
+
+    .leaflet-control-minimap { margin-bottom: 5px !important; border: 2px solid #ffc1cc !important; border-radius: 4px; }
+    .weather-control { background: rgba(255,255,255,0.98); padding: 15px 25px; border: 2px solid #ffc1cc; border-radius: 20px; text-align: center; box-shadow: 0 4px 15px rgba(255, 182, 193, 0.4); min-width: 150px; }
+    .weather-title { font-size: 11px; color: #ff69b4; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 5px; font-weight: 700; }
+    .weather-value { font-size: 24px; font-weight: 800; color: #d66d90; margin-bottom: 2px; line-height: 1.2; }
+    .weather-temp { color: #888; font-size: 13px; font-weight: 400; }
+  </style>
+</head>
+<body>
+
+  <div class="map-title">
+    <h4>Cross Loučka</h4>
+  </div>
+
+  <div id="map"></div>
+
+  <div class="authors-footer">
+    2025 © Autoři: Alžběta SKÝPALOVÁ, Barbora JANČOVÁ, Matěj LOUKOTA, Zbyněk DUŠEK, Tomáš POLÁK
+  </div>
+
+  <script>
+    // DATA
+    const rawLehka = [[17.2106218, 49.8178304], [17.2105392, 49.8175483], [17.210483, 49.8174358], [17.210409, 49.8173244], [17.2103549, 49.8171984], [17.2103125, 49.8170187], [17.2103382, 49.8168979], [17.2104184, 49.81681], [17.2106388, 49.8167222], [17.2108964, 49.816689], [17.2110929, 49.8166654], [17.2112296, 49.8166652], [17.2112897, 49.8166849], [17.2113411, 49.8167155], [17.2113789, 49.8167656], [17.2113935, 49.8168074], [17.2114046, 49.816917], [17.2114192, 49.8170268], [17.2114515, 49.8171582], [17.2114737, 49.8172413], [17.2115356, 49.8173903], [17.2115001, 49.8174521], [17.2114272, 49.8174742], [17.2113383, 49.8174821], [17.211222, 49.8174859], [17.2111043, 49.817476], [17.2109891, 49.8174731], [17.2108759, 49.8174794], [17.2107898, 49.8175373], [17.2107895, 49.8175849], [17.2107846, 49.8176391], [17.2107846, 49.8177525], [17.2107541, 49.817814], [17.2106645, 49.8178491], [17.2106218, 49.8178304]];
+    const rawStredni = [[17.214232, 49.8182908], [17.2141595, 49.8182612], [17.213964, 49.81821], [17.2137037, 49.8181931], [17.2131701, 49.8181291], [17.2129691, 49.8181366], [17.2127289, 49.8181936], [17.212287, 49.8183533], [17.2119951, 49.8184274], [17.2114615, 49.8184995], [17.2112463, 49.8185083], [17.2111817, 49.8184724], [17.211206, 49.8183832], [17.2112897, 49.8183183], [17.2114195, 49.8182722], [17.2117215, 49.8182237], [17.2120787, 49.8181584], [17.2123875, 49.8180624], [17.2124371, 49.8180217], [17.2124469, 49.8180012], [17.212447, 49.8179836], [17.2124451, 49.8179487], [17.2124283, 49.8179326], [17.2124067, 49.8179222], [17.2123833, 49.8179146], [17.2123565, 49.8179116], [17.2123368, 49.8179146], [17.2122972, 49.8179215], [17.2117085, 49.8180667], [17.2110269, 49.818234], [17.2109115, 49.8182957], [17.2108039, 49.8183814], [17.2107887, 49.8184529], [17.2108085, 49.818526], [17.2108471, 49.8185581], [17.2108964, 49.8185948], [17.2109508, 49.8186124], [17.2110539, 49.8186299], [17.2113742, 49.8186586], [17.2117225, 49.8186476], [17.2123897, 49.8184869], [17.2128584, 49.8183222], [17.2130104, 49.8182567], [17.2130801, 49.8182481], [17.2131102, 49.81825], [17.2131466, 49.8182606], [17.2131734, 49.8182836], [17.2131927, 49.8183061], [17.2132045, 49.8183282], [17.2132349, 49.8183613], [17.2132667, 49.8183847], [17.2133079, 49.8183972], [17.2133811, 49.8183986], [17.2139078, 49.8184163], [17.2140698, 49.8184006], [17.2142035, 49.8183879], [17.2142343, 49.8183686], [17.2142456, 49.8183447], [17.214232, 49.8182908]];
+    const rawTezka = [[17.2112871, 49.8166445], [17.2113637, 49.8167128], [17.2114731, 49.8172213], [17.2115023, 49.8173107], [17.2115534, 49.8173719], [17.2116045, 49.8173931], [17.2116957, 49.8174096], [17.2117759, 49.8173978], [17.2118635, 49.8173719], [17.2119146, 49.8173484], [17.2119875, 49.8173084], [17.2120495, 49.8172095], [17.2121225, 49.8171106], [17.2121517, 49.8170165], [17.2122466, 49.8168964], [17.2123305, 49.8167646], [17.212418, 49.8166728], [17.2125311, 49.8165904], [17.2125968, 49.8165551], [17.2126843, 49.8165527], [17.2127719, 49.8165786], [17.212823, 49.8166187], [17.212812, 49.8166869], [17.2127756, 49.8168211], [17.2127318, 49.8169435], [17.2126333, 49.8170989], [17.2125165, 49.8172119], [17.2123779, 49.8173507], [17.2121444, 49.8174967], [17.2119875, 49.8175508], [17.2118197, 49.817612], [17.2116774, 49.8176379], [17.2113892, 49.8176803], [17.2112068, 49.8177156], [17.2110317, 49.8177344], [17.2109368, 49.8177792], [17.2109003, 49.8178192], [17.210893, 49.8178639], [17.2109332, 49.8178992], [17.2109988, 49.8179063], [17.2111338, 49.8179275], [17.2113199, 49.8178945], [17.2115023, 49.8178592], [17.2116993, 49.8178027], [17.212024, 49.8177062], [17.2123013, 49.8176262], [17.2126698, 49.8175579], [17.2130309, 49.8174849], [17.2132462, 49.8174449], [17.2133739, 49.8174496], [17.2134176, 49.8174896], [17.2134213, 49.8175461], [17.2133921, 49.8176097], [17.2133118, 49.8176568], [17.2130528, 49.817765], [17.2124472, 49.8180146], [17.2120568, 49.8181252], [17.2115789, 49.8182499], [17.2113126, 49.8183135], [17.2112506, 49.8184077], [17.2112834, 49.8184736], [17.2114512, 49.8184641], [17.2118051, 49.8184265], [17.2121262, 49.8183747], [17.2125603, 49.8182264], [17.2128741, 49.8181228], [17.2131002, 49.8181181], [17.2134286, 49.8181464], [17.21387, 49.8182029], [17.2142495, 49.8182641], [17.2142604, 49.8183182], [17.2142093, 49.8183606], [17.2141364, 49.8183865], [17.2139795, 49.8184006], [17.2137205, 49.8183747], [17.2134031, 49.8183912], [17.2132279, 49.8183959], [17.2128631, 49.8185348], [17.2127281, 49.8185866], [17.2124764, 49.8187819], [17.2123998, 49.8187937], [17.2123487, 49.8187678], [17.2123341, 49.8187278], [17.2123451, 49.8186807], [17.2125384, 49.8185866], [17.212761, 49.8184477], [17.2128595, 49.8183841], [17.2130455, 49.8183323], [17.2131586, 49.81829], [17.2131842, 49.8182547], [17.2131732, 49.8182405], [17.2131623, 49.8182217], [17.2131258, 49.818224], [17.2130528, 49.818224], [17.2128886, 49.8182782], [17.2125311, 49.8184218], [17.2121736, 49.8185536], [17.2118452, 49.8186219], [17.2114512, 49.818676], [17.211163, 49.8186572], [17.2110025, 49.8186007], [17.2108785, 49.8185489], [17.210842, 49.8185018], [17.2108164, 49.8184359], [17.2108055, 49.8183982], [17.210842, 49.8183465], [17.2108821, 49.818297], [17.2109149, 49.8182547], [17.2110755, 49.8181911], [17.211236, 49.8181581], [17.2114184, 49.8181205], [17.2116227, 49.8180828], [17.2118051, 49.8180452], [17.2122538, 49.8179251], [17.2124618, 49.8178545], [17.2125348, 49.8178168], [17.2125348, 49.8177933], [17.2124873, 49.8177697], [17.212429, 49.8177839], [17.2122356, 49.8178027], [17.2118416, 49.8178874], [17.2114549, 49.8179887], [17.2111083, 49.8180969], [17.2108712, 49.8181087], [17.2107289, 49.8179863], [17.2106596, 49.8177368], [17.2104115, 49.817073], [17.2103604, 49.8169011], [17.2103932, 49.8168282], [17.2105063, 49.816774], [17.2107617, 49.8167293], [17.2111667, 49.8166587], [17.2112871, 49.816644]];
+    const vodaData = { "type": "FeatureCollection", "features": [{ "type": "Feature", "properties": { "name": "Rybník" }, "geometry": { "type": "Polygon", "coordinates": [[ [ 17.2117065, 49.8172374 ], [ 17.2116589, 49.8172385 ], [ 17.2116111, 49.8172359 ], [ 17.2115765, 49.8172327 ], [ 17.211562, 49.8172181 ], [ 17.2115516, 49.8171957 ], [ 17.2115493, 49.8171682 ], [ 17.211548, 49.8171435 ], [ 17.2115893, 49.8171363 ], [ 17.211606, 49.8171364 ], [ 17.2116232, 49.8171436 ], [ 17.2116365, 49.8171421 ], [ 17.2116584, 49.8171332 ], [ 17.2116887, 49.8171309 ], [ 17.2117102, 49.8171332 ], [ 17.2117488, 49.8171291 ], [ 17.2117816, 49.8171293 ], [ 17.2118064, 49.8171295 ], [ 17.2118255, 49.8171289 ], [ 17.2118514, 49.8171268 ], [ 17.2118767, 49.8171284 ], [ 17.2118866, 49.8171352 ], [ 17.2118846, 49.8171431 ], [ 17.2118793, 49.8171536 ], [ 17.2118793, 49.8171678 ], [ 17.2118805, 49.8171839 ], [ 17.2118863, 49.8171937 ], [ 17.2118796, 49.8172084 ], [ 17.2118553, 49.8172149 ], [ 17.2118321, 49.8172228 ], [ 17.2118097, 49.8172261 ], [ 17.2117723, 49.8172227 ], [ 17.211761, 49.8172296 ], [ 17.2117293, 49.8172318 ], [ 17.2117065, 49.8172374 ]]] } }] };
+    const budovyData = { "type": "FeatureCollection", "features": [{ "type": "Feature", "properties": { "name": "Zázemí" }, "geometry": { "type": "Polygon", "coordinates": [[ [ 17.2116316, 49.8166501 ], [ 17.2114123, 49.8166698 ], [ 17.2114055, 49.8166253 ], [ 17.2116255, 49.8166044 ], [ 17.2116316, 49.8166501 ]]] } }] };
+
+    const startLat = 49.817300;  
+    const startLng = 17.212500;  
+    const startZoom = 17;        
+    const map = L.map('map', { minZoom: 7 }).setView([startLat, startLng], startZoom);
+
+    const mapyCz = L.tileLayer('https://api.mapy.cz/v1/maptiles/basic/256/{z}/{x}/{y}?apikey=5ZtGuQEtvV37xyC_1IJnglc8ZgP53ehgvFqTiHuaFoI', { minZoom: 0, maxZoom: 19, attribution: '&copy; Seznam.cz, a.s.' });
+    const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' });
+    const ortofoto = L.tileLayer('https://gis.upol.cz/motokros/{z}/{x}/{y}.png', { attribution: '&copy; UPOL, OSM' });
+
+    function smoothGeometry(coords, iterations) {
+        if (iterations === 0) return coords;
+        let smoothed = [];
+        smoothed.push(coords[0]);
+        for (let i = 0; i < coords.length - 1; i++) {
+            let p0 = coords[i];
+            let p1 = coords[i+1];
+            smoothed.push([0.75 * p0[0] + 0.25 * p1[0], 0.75 * p0[1] + 0.25 * p1[1]]);
+            smoothed.push([0.25 * p0[0] + 0.75 * p1[0], 0.25 * p0[1] + 0.75 * p1[1]]);
+        }
+        smoothed.push(coords[coords.length - 1]);
+        return smoothGeometry(smoothed, iterations - 1);
+    }
+
+    const smoothLehka = smoothGeometry(rawLehka, 4);
+    const smoothStredni = smoothGeometry(rawStredni, 4);
+    const smoothTezka = smoothGeometry(rawTezka, 4);
+
+    const lehkaData = { "type": "FeatureCollection", "features": [{ "type": "Feature", "properties": { "difficulty": "easy", "name": "Lehký okruh" }, "geometry": { "type": "LineString", "coordinates": smoothLehka } }] };
+    const stredniData = { "type": "FeatureCollection", "features": [{ "type": "Feature", "properties": { "difficulty": "medium", "name": "Střední okruh" }, "geometry": { "type": "LineString", "coordinates": smoothStredni } }] };
+    const tezkaData = { "type": "FeatureCollection", "features": [{ "type": "Feature", "properties": { "difficulty": "hard", "name": "Těžký okruh" }, "geometry": { "type": "LineString", "coordinates": smoothTezka } }] };
+
+    function styleFeature(feature) {
+        const commonLine = { weight: 5, opacity: 0.9, lineCap: 'round', lineJoin: 'round', dashArray: '15, 10' };
+        if (feature.properties.difficulty === 'hard') return { ...commonLine, color: "#e74c3c" };
+        if (feature.properties.difficulty === 'medium') return { ...commonLine, color: "#3498db" };
+        if (feature.properties.difficulty === 'easy') return { ...commonLine, color: "#2ecc71" };
+        if (feature.properties.name === 'Rybník') return { color: "#3498db", fillColor: "#aaddff", fillOpacity: 0.7, weight: 2 };
+        if (feature.properties.name === 'Zázemí') return { color: "#7f8c8d", fillColor: "#bdc3c7", fillOpacity: 0.7, weight: 2 };
+        return { color: "gray" };
+    }
+
+    function onEachFeature(feature, layer) {
+        let content = `<div class="popup-title">${feature.properties.name || "Objekt"}</div>`;
+        if (feature.properties.difficulty) {
+            let diffLabel = ""; let color = "";
+            switch(feature.properties.difficulty) {
+                case 'hard': diffLabel = "Těžká"; color = "#e74c3c"; break;
+                case 'medium': diffLabel = "Střední"; color = "#3498db"; break;
+                case 'easy': diffLabel = "Lehká"; color = "#2ecc71"; break;
+            }
+            content += `<div style="color:#555">Obtížnost: <b style="color:${color}">${diffLabel}</b> ●</div>`;
+        }
+        layer.bindPopup(content, { className: 'custom-popup' });
+        if (feature.geometry.type === 'LineString') {
+            layer.on({
+                mouseover: function(e) { e.target.setStyle({ weight: 8, opacity: 1 }); },
+                mouseout: function(e) { layer.setStyle(styleFeature(feature)); }
+            });
+        }
+    }
+
+    const layerVoda = L.geoJSON(vodaData, { style: styleFeature, onEachFeature: onEachFeature });
+    const layerBudovy = L.geoJSON(budovyData, { style: styleFeature, onEachFeature: onEachFeature });
+    const layerTezka = L.geoJSON(tezkaData, { style: styleFeature, onEachFeature: onEachFeature });
+    const layerStredni = L.geoJSON(stredniData, { style: styleFeature, onEachFeature: onEachFeature });
+    const layerLehka = L.geoJSON(lehkaData, { style: styleFeature, onEachFeature: onEachFeature });
+
+    // VÝCHOZÍ MAPA
+    mapyCz.addTo(map);   
+    ortofoto.addTo(map); // Ortofoto zapnuto defaultně
+    layerVoda.addTo(map);
+    layerBudovy.addTo(map);
+    layerTezka.addTo(map); 
+
+    // OVLÁDÁNÍ PANELŮ (Sbalování)
+    window.togglePanel = function(header) {
+        const panel = header.parentElement;
+        panel.classList.toggle('collapsed');
+    };
+
+    // 1. PODKLADY (STATICKÝ PANEL - BEZ HLAVIČKY, UPLNE NAHOŘE)
+    const LayersControl = L.Control.extend({
+        onAdd: function(map) {
+            const div = L.DomUtil.create('div', 'pinkity-panel headless-panel');
+            L.DomEvent.disableClickPropagation(div);
+            // Žádný panel-header, rovnou obsah
+            div.innerHTML = `
+                <div class="panel-content">
+                    <label><input type="radio" name="base_layer" value="mapycz" checked onchange="switchBaseLayer('mapycz')"> Mapy.cz</label>
+                    <label><input type="radio" name="base_layer" value="osm" onchange="switchBaseLayer('osm')"> OpenStreetMap</label>
+                    
+                    <div class="layer-separator"></div>
+
+                    <label><input type="checkbox" onchange="toggleOverlay('ortofoto', this)" checked> Ortofoto</label>
+                    <label><input type="checkbox" onchange="toggleOverlay('voda', this)" checked> <i class="poly-icon" style="background:#aaddff; border-color:#3498db;"></i> Voda</label>
+                    <label><input type="checkbox" onchange="toggleOverlay('budovy', this)" checked> <i class="poly-icon" style="background:#bdc3c7; border-color:#7f8c8d;"></i> Budovy</label>
+                </div>
+            `;
+            return div;
+        }
+    });
+    map.addControl(new LayersControl({ position: 'topright' }));
+
+    window.switchBaseLayer = function(type) {
+        if(map.hasLayer(mapyCz)) map.removeLayer(mapyCz);
+        if(map.hasLayer(osm)) map.removeLayer(osm);
+        
+        if(type === 'mapycz') map.addLayer(mapyCz);
+        if(type === 'osm') map.addLayer(osm);
+        
+        updateOrtofotoIndex();
+    };
+
+    window.toggleOverlay = function(type, checkbox) {
+        let layer;
+        if(type === 'ortofoto') layer = ortofoto;
+        if(type === 'voda') layer = layerVoda;
+        if(type === 'budovy') layer = layerBudovy;
+
+        if(checkbox.checked) {
+            if(!map.hasLayer(layer)) map.addLayer(layer);
+        } else {
+            if(map.hasLayer(layer)) map.removeLayer(layer);
+        }
+        if (type === 'ortofoto') updateOrtofotoIndex();
+    };
+
+    function updateOrtofotoIndex() {
+        if(map.hasLayer(ortofoto)) ortofoto.bringToBack(); 
+        if(map.hasLayer(mapyCz)) mapyCz.bringToBack();
+        if(map.hasLayer(osm)) osm.bringToBack();
+    }
+
+    // 2. VÝBĚR TRATÍ (ROZBALOVACÍ, UPROSTŘED)
+    const TrackControl = L.Control.extend({
+        onAdd: function(map) {
+            const div = L.DomUtil.create('div', 'pinkity-panel track-switcher');
+            // ZDE přidána třída collapsed pro sbalení při startu
+            div.classList.add('collapsed');
+            
+            L.DomEvent.disableClickPropagation(div);
+            // UPRAVENO: POUŽITÍ SVG SE ZAOBLENÝMI ROHY (lineCap: round)
+            div.innerHTML = `
+                <div class="panel-header" onclick="togglePanel(this)">
+                    <h4>Výběr Tratě</h4>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="panel-content">
+                    <label><input type="radio" name="track_selector" value="none" onchange="switchTrack('none')"> 🚫 Vypnout tratě</label>
+                    
+                    <label>
+                        <input type="radio" name="track_selector" value="easy" onchange="switchTrack('easy')"> 
+                        <svg class="track-svg" width="30" height="6"><line x1="0" y1="3" x2="30" y2="3" stroke="#2ecc71" stroke-width="4" stroke-dasharray="6, 6" stroke-linecap="round" /></svg>
+                        Lehká trať
+                    </label>
+                    <label>
+                        <input type="radio" name="track_selector" value="medium" onchange="switchTrack('medium')"> 
+                        <svg class="track-svg" width="30" height="6"><line x1="0" y1="3" x2="30" y2="3" stroke="#3498db" stroke-width="4" stroke-dasharray="6, 6" stroke-linecap="round" /></svg>
+                        Střední trať
+                    </label>
+                    <label>
+                        <input type="radio" name="track_selector" value="hard" checked onchange="switchTrack('hard')"> 
+                        <svg class="track-svg" width="30" height="6"><line x1="0" y1="3" x2="30" y2="3" stroke="#e74c3c" stroke-width="4" stroke-dasharray="6, 6" stroke-linecap="round" /></svg>
+                        Těžká trať
+                    </label>
+                </div>
+            `;
+            return div;
+        }
+    });
+    map.addControl(new TrackControl({ position: 'topright' }));
+
+    window.switchTrack = function(type) {
+        [layerTezka, layerStredni, layerLehka].forEach(l => { if (map.hasLayer(l)) map.removeLayer(l); });
+        if (type === 'hard') layerTezka.addTo(map);
+        if (type === 'medium') layerStredni.addTo(map);
+        if (type === 'easy') layerLehka.addTo(map);
+    };
+
+    // 3. LEGENDA (ROZBALOVACÍ, DOLE)
+    const legenda = L.control({ position: 'topright' });
+    legenda.onAdd = function () {
+      const div = L.DomUtil.create('div', 'pinkity-panel legend');
+      // ZDE přidána třída collapsed pro sbalení při startu
+      div.classList.add('collapsed');
+      
+      L.DomEvent.disableClickPropagation(div);
+      L.DomEvent.disableScrollPropagation(div);
+      
+      // UPRAVENO: STEJNÉ SVG IKONY JAKO U VÝBĚRU TRATÍ
+      div.innerHTML = `
+        <div class="panel-header" onclick="togglePanel(this)">
+            <h4>Legenda</h4>
+            <span class="toggle-icon">▼</span>
+        </div>
+        <div class="panel-content">
+            <div><svg class="track-svg" width="30" height="6"><line x1="0" y1="3" x2="30" y2="3" stroke="#2ecc71" stroke-width="4" stroke-dasharray="6, 6" stroke-linecap="round" /></svg> Lehká trať</div>
+            <div><svg class="track-svg" width="30" height="6"><line x1="0" y1="3" x2="30" y2="3" stroke="#3498db" stroke-width="4" stroke-dasharray="6, 6" stroke-linecap="round" /></svg> Střední trať</div>
+            <div><svg class="track-svg" width="30" height="6"><line x1="0" y1="3" x2="30" y2="3" stroke="#e74c3c" stroke-width="4" stroke-dasharray="6, 6" stroke-linecap="round" /></svg> Těžká trať</div>
+            <div style="margin-top:5px"><i class="poly-icon" style="background:#aaddff; border-color:#3498db;"></i> Voda</div>
+            <div><i class="poly-icon" style="background:#bdc3c7; border-color:#7f8c8d;"></i> Budovy</div>
+        </div>
+      `;
+      return div;
+    };
+    legenda.addTo(map);
+
+    // OSTATNÍ OVLÁDACÍ PRVKY
+    const osmMini = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
+    new L.Control.MiniMap(osmMini, { toggleDisplay: true, position: 'bottomleft' }).addTo(map);
+    L.control.scale().addTo(map);
+    
+    L.Control.Home = L.Control.extend({
+        onAdd: function(map) {
+            const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+            const button = L.DomUtil.create('a', 'home-icon', container);
+            button.href = '#'; button.title = "Domů"; button.innerHTML = '🏰';
+            button.onclick = function(e) { e.preventDefault(); map.setView([startLat, startLng], startZoom); }
+            L.DomEvent.disableClickPropagation(container);
+            return container;
+        },
+    });
+    map.addControl(new L.Control.Home({ position: 'topleft' }));
+
+    // Počasí
+    L.Control.Weather = L.Control.extend({
+        onAdd: function(map) {
+            const container = L.DomUtil.create('div', 'weather-control');
+            container.innerHTML = '<div>Načítám... ☁️</div>';
+            fetch(`https://api.open-meteo.com/v1/forecast?latitude=${startLat}&longitude=${startLng}&current_weather=true`)
+            .then(r => r.json()).then(data => {
+                const code = data.current_weather.weathercode;
+                let stav = "SUCHO ☀️";
+                if (code >= 95) stav = "BOUŘKA ⛈️"; else if (code >= 51 || (code >= 80 && code <= 82)) stav = "BLÁTO 🌧️"; else if (code >= 71) stav = "SNÍH ❄️"; else if (code >= 45 && code <= 48) stav = "MLHA 🌫️";
+                container.innerHTML = `<div class="weather-title">STAV TRATI</div><div class="weather-value">${stav}</div><div class="weather-temp">Teplota: ${data.current_weather.temperature}°C</div>`;
+            }).catch(() => { container.innerHTML = "Počasí nedostupné"; });
+            return container;
+        }
+    });
+    map.addControl(new L.Control.Weather({ position: 'topleft' }));
+
+  </script>
+</body>
+</html>
